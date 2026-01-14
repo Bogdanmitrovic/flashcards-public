@@ -1,0 +1,89 @@
+import 'package:auto_route/auto_route.dart';
+import 'package:flashcards/bloc/pack/delete_pack/delete_pack_cubit.dart';
+import 'package:flashcards/config/router/router.dart';
+import 'package:flashcards/data/repositories/flashcards/pack_repository.dart';
+import 'package:flashcards/domain/models/flashcards/admin_pack/admin_pack.dart';
+import 'package:flashcards/ui/constants/styles.dart';
+import 'package:flashcards/ui/dialogs/profile/admin_dashboard/flashcard_builder/delete_pack_dialog.dart';
+import 'package:flashcards/ui/dialogs/profile/admin_dashboard/flashcard_builder/rename_pack_dialog.dart';
+import 'package:flashcards/ui/theme/theme_extensions.dart';
+import 'package:flashcards/ui/theme/theme_extensions.dart';
+import 'package:flashcards/ui/theme/theme_extensions.dart';
+import 'package:flashcards/ui/theme/theme_extensions.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+void showPackOptionsBottomSheet(BuildContext context, AdminPack pack) {
+  showModalBottomSheet(
+    showDragHandle: true,
+    backgroundColor: Colors.grey.shade100,
+    context: context,
+    shape: bottomSheetShape,
+    //
+    builder: (context) {
+      void navigateTo(PageRouteInfo route) {
+        context.router.pop();
+        context.router.push(route);
+      }
+
+      return Padding(
+        padding: bottomSheetPadding,
+        child: Wrap(
+          children: [
+            Column(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.folder),
+                  title: Text(pack.packName),
+                  subtitle: Text("Flashcards: ${pack.flashcardsCount}"),
+                ),
+
+                Divider(),
+
+                ListTile(
+                  onTap: () => navigateTo(CreateFlashcardRoute(pack: pack)),
+                  leading: Icon(
+                    Icons.add_circle_outline,
+                    color: context.colors.primary,
+                  ),
+                  title: Text("Add Flashcards"),
+                ),
+                ListTile(
+                  onTap:
+                      () => navigateTo(ManagePackFlashcardsRoute(pack: pack)),
+                  leading: Icon(Icons.edit_note, color: context.colors.primaryContainer),
+                  title: Text("Edit/Delete Flashcards"),
+                ),
+                ListTile(
+                  onTap: () {
+                    context.router.pop();
+                    showRenamePackDialog(context, pack, null);
+                  },
+                  leading: Icon(
+                    Icons.drive_file_rename_outline,
+                    color: context.colors.primaryContainer,
+                  ),
+                  title: Text("Rename Pack"),
+                ),
+                ListTile(
+                  onTap: () async {
+                    context.router.pop();
+                    final cubit = DeletePackCubit(
+                      packRepo: context.read<PackRepository>(),
+                    );
+                    await showDeletePackDialog(context, pack, cubit, null);
+                    cubit.close();
+                  },
+                  leading: Icon(Icons.delete_forever, color: context.colors.error),
+                  title: Text("Delete Pack"),
+                  subtitle: Text("You can only delete pack if it's empty"),
+                  subtitleTextStyle: TextStyle(color: context.colors.primaryContainer),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}

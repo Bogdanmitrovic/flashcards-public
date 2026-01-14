@@ -1,0 +1,158 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flashcards/data/remote/cloud_function_service.dart';
+import 'package:flashcards/data/services/api/dto/flashcards/custom_session/custom_session_patch/custom_session_patch_dto.dart';
+import 'package:flashcards/data/services/api/dto/flashcards/custom_session/flashcard_ids/flashcard_ids_dto.dart';
+import 'package:flashcards/data/utils/data_utils.dart';
+import 'package:flashcards/data/remote/firestore_db_context.dart';
+import 'package:flashcards/data/services/api/dto/flashcards/custom_session/custom_session_dto.dart';
+import 'package:flashcards/data/services/api/dto/requests/create_custom_session/create_custom_session_request_dto.dart';
+import 'package:flashcards/utils/result.dart';
+import 'package:flashcards/utils/typedefs.dart';
+
+class CustomSessionService {
+  final CollectionReference<JsonMap> _customSessions;
+  final CollectionReference<JsonMap> Function(String sessionId)
+  _getFlashcardIdsCollection;
+  final WriteBatch Function() _createBatch;
+  final CloudFunctionService _functions;
+
+  final String _flashcardIdsDocName;
+
+  CustomSessionService({
+    required FirestoreDbContext dbContext,
+    required CloudFunctionService cloudFunctionService,
+  }) : _customSessions = dbContext.customSessions,
+       _functions = cloudFunctionService,
+       _getFlashcardIdsCollection = dbContext.getSessionFlashcardIdsCollection,
+       _createBatch = dbContext.createBatch,
+       _flashcardIdsDocName = dbContext.flashcardIdsDocName;
+
+  Future<Result<PaginatedDtoResult<CustomSessionDto>>>
+  getCustomSessionForProfilePagination({
+    required String profileId,
+    required DocumentSnapshot? startAfter,
+    required int limit,
+  }) async {
+    try {
+      var query = _customSessions
+          .orderBy('createdAt', descending: true)
+          .where('profileId', isEqualTo: profileId)
+          .limit(limit);
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.get();
+      final dtoList =
+          snapshot.docs
+              .map((doc) => CustomSessionDto.fromJsonWithId(doc.data(), doc.id))
+              .toList();
+
+      return Result.ok(
+        PaginatedDtoResult(
+          items: dtoList,
+          lastDocument: getLastDocFromSnapshot(snapshot),
+        ),
+      );
+    } on Exception catch (error) {
+      return Result.error(error);
+    }
+  }
+
+  Future<Result<FlashcardIdsDto>> getFlashcardIdsForCustomSession(
+    String customSessionId,
+  ) async {
+    try {
+      final ref = _getFlashcardIdsCollection(customSessionId);
+      final snapshot = await ref.doc(_flashcardIdsDocName).get();
+      if (!snapshot.exists) {
+        throw Exception("All_ids document doesn't exist");
+      }
+
+      final dto = FlashcardIdsDto.fromJson(snapshot.data()!);
+
+      return Result.ok(dto);
+    } on Exception catch (error) {
+      return Result.error(error);
+    }
+  }
+
+  Future<Result<void>> createCustomSession(
+    CreateCustomSessionRequestDto request,
+  ) async {
+    try {
+      final result = await _functions.createCustomSession(request);
+      //final data = result.data as List<dynamic>;
+
+      // final snapshots =
+      //     data.map((item) => FlashcardSnapshotDto.fromJson(item)).toList();
+      return Result.ok(null);
+    } on Exception catch (error) {
+      return Result.error(error);
+    }
+  }
+
+  Future<Result<void>> incrementCurrentIndex({
+    required String sessionId,
+    required int increment,
+  }) async {
+    try {
+      final ref = _customSessions.doc(sessionId);
+      await ref.update({"currentIndex": FieldValue.increment(increment)});
+
+      return Result.ok(null);
+    } on Exception catch (error) {
+      return Result.error(error);
+    }
+  }
+
+  Future<Result<void>> incrementCurrentIndexAndCorrectCount({
+    required String sessionId,
+    required int currentIndexIncrement,
+    required int rightIncrement,
+  }) async {
+    try {
+      final ref = _customSessions.doc(sessionId);
+      await ref.update({
+        "currentIndex": FieldValue.increment(currentIndexIncrement),
+        "correctCount": FieldValue.increment(rightIncrement),
+      });
+
+      return Result.ok(null);
+    } on Exception catch (error) {
+      return Result.error(error);
+    }
+  }
+
+  Future<Result<void>> patchCustomSession({
+    required String sessionId,
+    required CustomSessionPatchDto dto,
+  }) async {
+    try {
+      final ref = _customSessions.doc(sessionId);
+      await ref.update(dto.toJson());
+
+      return Result.ok(null);
+    } on Exception catch (error) {
+      return Result.error(error);
+    }
+  }
+
+  Future<Result<void>> deleteCustomSession(String sessionId) async {
+    try {
+      final batch = _createBatch();
+      final sessionRef = _customSessions.doc(sessionId);
+      final flashcardIdsRef = _getFlashcardIdsCollection(
+        sessionId,
+      ).doc(_flashcardIdsDocName);
+
+      batch.delete(sessionRef);
+      batch.delete(flashcardIdsRef);
+      await batch.commit();
+
+      return Result.ok(null);
+    } on Exception catch (error) {
+      return Result.error(error);
+    }
+  }
+}

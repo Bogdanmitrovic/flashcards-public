@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "default": "flashpedz",
+    "dev": "flashpedz",
+    "prod": "flashpedz-faisal"
+  },
+  "targets": {},
+  "etags": {}
+}
