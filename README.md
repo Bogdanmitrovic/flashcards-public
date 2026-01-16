@@ -1,52 +1,62 @@
-# Flashpedz - Smart flashcards and OSCE tests
-Flashpedz is a mobile application designed to help medical students learn easier.
-Two major features of the app are:
-- Spaced Repetition learning with flashcards
+# Flashpedz – Smart Flashcards and OSCE Tests
+
+Flashpedz is a mobile application designed to help medical students learn more effectively.
+
+The two main features of the application are:
+- Spaced repetition learning with flashcards
 - OSCE tests
 
-App also includes admin panel, allowing admins to create new packs with flashcards and create OSCE tests,
-as well as managing flashcards through reporting system.
+The application also includes an admin panel, allowing administrators to create new flashcard packs and OSCE tests,
+as well as manage flashcards through a reporting system.
 
-Free and paid packs, as well as free and paid OSCE test exist, user needs to pay a monthly subscription in order
-to access paid content.
+Both free and paid flashcard packs and OSCE tests are available.
+Users must purchase a monthly subscription to access paid content.
+
+---
 
 # Table of Contents
-- [Flashpedz - Smart flashcards and OSCE tests](#flashpedz---smart-flashcards-and-osce-tests)
+- [Flashpedz – Smart Flashcards and OSCE Tests](#flashpedz--smart-flashcards-and-osce-tests)
 - [Table of Contents](#table-of-contents)
 - [System Architecture](#system-architecture)
-    - [This github repository contains code for **Flutter Application** layer.](#this-github-repository-contains-code-for-flutter-application-layer)
+  - [Important Note](#important-note)
 - [How to Run (Production – Mobile Recommended)](#how-to-run-production--mobile-recommended)
   - [Prerequisites](#prerequisites)
   - [Platform Recommendation](#platform-recommendation)
     - [Step 1. Clone the project](#step-1-clone-the-project)
     - [Step 2. Run the flutter application](#step-2-run-the-flutter-application)
 - [Flutter Application Architecture](#flutter-application-architecture)
+  - [Architecture Description](#architecture-description)
   - [Data Layer](#data-layer)
   - [UI Layer](#ui-layer)
 - [Auth Session Management](#auth-session-management)
+  - [Auth BLoC states](#auth-bloc-states)
+  - [Auth State Flow](#auth-state-flow)
+  - [Auth State Lifecycle](#auth-state-lifecycle)
+  - [Sign Out Handling](#sign-out-handling)
 - [User Profile Management](#user-profile-management)
 - [How Does Spaced Repetition work with Flashcards?](#how-does-spaced-repetition-work-with-flashcards)
   - [What is spaced repetition?](#what-is-spaced-repetition)
   - [How is spaced repetition implemented in this project?](#how-is-spaced-repetition-implemented-in-this-project)
-    - [Opening a pack will start the flashcard test](#opening-a-pack-will-start-the-flashcard-test)
-  - [Bookmark test with flashcards](#bookmark-test-with-flashcards)
-  - [Custom sessions with flashcards](#custom-sessions-with-flashcards)
-- [How does OSCE tests work?](#how-does-osce-tests-work)
+    - [Opening a Pack Starts the Flashcard Test](#opening-a-pack-starts-the-flashcard-test)
+  - [Bookmark Test with Flashcards](#bookmark-test-with-flashcards)
+  - [Custom Sessions with Flashcards](#custom-sessions-with-flashcards)
+- [How OSCE Tests Work](#how-osce-tests-work)
+  - [OSCE Database](#osce-database)
+  - [How Users Interact with OSCE Tests](#how-users-interact-with-osce-tests)
 
 
 ---
 
 # System Architecture
 
-### This github repository contains code for **Flutter Application** layer.
 
 ```mermaid
 graph TB
-    APP[Flutter Application]
+    APP[Flutter Client Application]
     APP -->|Security Operations| CF[Firebase Cloud Functions]
 
 
-    subgraph FB[Fireabse System]
+    subgraph FB[Firebase System]
         direction TB
         AUTH[Authentication]
         DB[Firestore Database]
@@ -61,29 +71,36 @@ graph TB
 
 ```
 
+Firebase Cloud Functions are used for security-sensitive operations and backend logic that should not be executed on the client.
+
 > Firebase system is composed of multiple managed services including authentication, database and storage, which together provide backend-as-a-service functionality.
 
 > Algolia is connected to firebase system and it's used for fast text searching and filtering of data.
+
+## Important Note
+
+This repository does not contain backend microservices or Firebase infrastructure configuration,
+only the **Flutter client application**.
 
 ---
 
 # How to Run (Production – Mobile Recommended)
 
 ## Prerequisites
-- Flutter and its dependencies [Install Guide](https://docs.flutter.dev/install)
-- Mobile device, physical or emulated
-- Firebase project API key
+- Flutter SDK and its dependencies ([Install Guide](https://docs.flutter.dev/install))
+- A mobile device (physical or emulated)
+- Firebase project configuration (API keys and config files)
 
-> TODO: firebase project API key
+> TODO: Add instructions for setting up Firebase project configuration
 
 ## Platform Recommendation
 
-The production flavour is **intended and tested primarily for Android/iOS**.
-Running the application on Android/iOS (emulator or physical device) is **strongly recommended**.
+The production flavour is **intended and tested primarily for mobile platforms (Android and iOS)**.
+Running the application on an Android or iOS device (emulator or physical device) is **strongly recommended**.
 
 ### Step 1. Clone the project
 ```bash
-git clone https://github.com/dile001/flashcards
+git clone https://github.com/dile001/flashcards.git
 cd flashcards
 ```
 
@@ -95,13 +112,14 @@ This command:
 - Uses main_prod.dart as the application entry point
 - Runs the app with production configuration (Firebase, API endpoints, etc.)
 
-> There is also a dev flavour but it's not working properly
+> A development flavour exists, but it is currently unstable and not recommended for use.
 
 ---
 
 # Flutter Application Architecture
 
-We opted for _MVVM_-like architecture for this project. It ended up being a good idea since codebase grew fast.
+We adopted an **MVVM-like architecture** for this project.
+This decision proved effective as the codebase grew rapidly.
 
 ```mermaid
 graph LR
@@ -122,82 +140,126 @@ graph LR
 > For more detailed explanation, check [Flutter Guide](https://docs.flutter.dev/app-architecture/guide)
 
 
-Each of the layers have their own classes and are injected using **Dependency Injection (with *Provider* package)**. The order of injecting one layer to another is shown using arrows.
+## Architecture Description
 
-**Repository** can use multiple *Services*, **BLoC** can use multiple *Repositories*, but one **View** can only use one and deticated **View Model**.
-Only one *View Model* belongs to one *View*.
+Each layer has its own set of classes and is connected using **Dependency Injection**
+(via the *Provider* package).
+
+The dependency direction between layers is illustrated by the arrows in the diagram.
+
+- A **Repository** can depend on multiple *Services*
+- A **BLoC (ViewModel)** can depend on multiple *Repositories*
+- Each **View** is associated with exactly one dedicated **ViewModel**
+- A **ViewModel** belongs to a single **View**
+
+The ViewModel layer is implemented using the **BLoC** pattern to manage state and business logic.
 
 
 ## Data Layer
 
-**Data Layer** provides abstraction layer of the data that the application uses, including:
-- **Firestore data models** - every single collection in database has it's own _Service_ and _Repository_ implementation.
-- **Firebase authentication** - responsible for managing user session
-- **Firebase storage** - responsible for writing and accessing storage in a particular format, making it easier to understand and organize data
-- **Algolia Search** - abstraction layer for using algolia search on databse models
-- **Local Storage**, etc...
+The **Data Layer** provides an abstraction over all data sources used by the application, including:
 
-**Services** are responsible for calling external APIs and isolating those calls inside a function.
-**Repositories** are using injected *services* and are responsible for business logic when it comes to data. 
+- **Firestore data models** – each database collection has its own corresponding _Service_ and _Repository_ implementation
+- **Firebase Authentication** – responsible for managing user sessions
+- **Firebase Storage** – responsible for reading from and writing to cloud storage in a consistent and organized format
+- **Algolia Search** – abstraction layer for performing full-text search and filtering on database models
+- **Local Storage**, etc.
 
-This layer is located under ```lib/data```
+**Services** are responsible for calling external APIs and isolating those calls behind well-defined functions.  
+**Repositories** use injected *Services* and encapsulate business logic related to data handling.
 
-Each repository usually has it's corresponding **Domain Model**, ex. *PackRespository* functions usually return *Pack* class.
-Domain models are located under ```lib/domain/models```
+This layer is located under: ```lib/data```
 
-Services are working with *dto* classes, they represent data structes that external API's return back. They are located under ```lib/services/api/dto```. Services usually return some sort of dto class, which are later used by repositories to convert from dto to domain model classes.
+Each repository usually has a corresponding Domain Model.
+For example, PackRepository methods typically return instances of the Pack domain model.
+Domain models are located under: ```lib/domain/models```
 
+Services work with DTO (Data Transfer Object) classes, which represent data structures returned by external APIs.
+These DTOs are located under: ```lib/services/api/dto```
+
+Services usually return DTO instances, which are then converted by repositories into domain model objects.
 
 ## UI Layer
 
-**UI Layer** is responsible for rendering flutter UI components and managing UI business logic.
+The **UI Layer** is responsible for rendering Flutter UI components and managing UI-related business logic.
 
-For UI business logic we are using **BLoC** package.
+UI business logic is implemented using the **BLoC** package.
 
-Every **View** (Page, Pop Up Alert, Bottom sheet...) has it's own **View Model class / BLoC** for managing UI business logic for that view.
+Each **View** (page, popup dialog, bottom sheet, etc.) has its own dedicated **ViewModel / BLoC** responsible for handling the state and logic of that view.
 
-**BLoC** layer is under ```lib/bloc```.
+The **BLoC** layer is under ```lib/bloc```.
 
-**View** layer is under ```lib/ui```
+The **View** layer is under ```lib/ui```
 
-View layer uses **auto route** package for routing.
+The View layer uses the **auto_route** package for navigation and routing.
 
 ---
 
 # Auth Session Management
 
-**Firebase Authorization** is external service responsible for storing and managing user sessions.
+**Firebase Authentication** is an external service responsible for storing and managing user sessions.
 
-Application uses **GLOBAL** ```Auth Bloc``` to manage UI state to allow or block certain content if user is logged in or not.
+The application uses a **global `AuthBloc`** to manage authentication-related UI state and determine whether
+certain content should be accessible based on the user's authentication status.
 
-Global means that this service is injected directly into flutter's **context** using the *Provider* package. This way we can access user auth state anywhere in the **View layer**.
+“Global” means that this BLoC is injected directly into Flutter’s **context** using the *Provider* package,
+which allows the authentication state to be accessed anywhere in the **View layer**.
 
-*Auth Bloc* can have these states:
-- **Loading** - When app is waiting for auth async operation to finish
-- **Unauthenticated** - User is not logged in and email is verified, he isredirected to login page
-- **Authenticated** - User is logged in, he is redirected to home page.
-- **VerifyEmailPending** - User registered on platform but didn't verify the email. Users must verify email before using the application. It that case, user gets redirected to *email verification* page
+## Auth BLoC states
 
-These *Bloc* states change based on the ```auth streams``` that *Firebase auth* service sends. When app starts, it subscribes to those auth streams, and based on the *Auth Bloc States* it redirects user to a deticated page explained above.
+The `AuthBloc` can have the following states:
 
-When user creates a new account, based on user information that he entered, a document inside ```users``` collection is created.
+- **Loading** – The application is waiting for an asynchronous authentication operation to complete
+- **Unauthenticated** – The user is not logged in (or the session has ended) and is redirected to the login page
+- **Authenticated** – The user is logged in and is redirected to the home page
+- **VerifyEmailPending** – The user has registered but has not verified their email address.
+Email verification is required before the user can access the application, and the user is redirected
+to the email verification page
 
-User can log out in many different ways, for that reason we also store ```sign out reason``` inside ```unauthenticated``` bloc state. Based on that, we can redirect user to a deticated page. For example:
-- User manually logs out -> redirect to login page
-- JWT token expires -> pop up page gets displayed to inform the user
-- User deletes account -> redirect to "*good bye*" page
-- User updates the email -> redirect to *verify email* page
+## Auth State Flow
+
+The `AuthBloc` states change based on authentication streams provided by the Firebase Authentication service.
+When the application starts, it subscribes to these streams and reacts to state changes by redirecting
+the user to the appropriate page.
+
+When a user creates a new account, a corresponding document is created in the `users` collection in Firestore,
+based on the information provided during registration.
+
+## Auth State Lifecycle
+
+```mermaid
+flowchart LR
+    START[App Start] --> STREAM[Firebase Auth Stream]
+    STREAM --> BLOC[AuthBloc State]
+    BLOC --> REDIRECT[UI Redirection]
+
+```
+
+## Sign Out Handling
+
+Users can be logged out for multiple reasons. To handle this, the application stores a
+**sign-out reason** inside the `Unauthenticated` state.
+
+Based on the sign-out reason, the user is redirected to an appropriate screen. Examples include:
+
+- Manual logout → redirect to the login page
+- JWT token expiration → display a popup informing the user
+- Account deletion → redirect to the "goodbye" page
+- Email update → redirect to the email verification page
 
 ---
 
 # User Profile Management
 
-Similarly to *Auth Session Management*, we have one global ```Profile Reader Cubit``` (Cubit is just simpler version of BLoC) that is injected into flutter's context and is accessible anywhere inside **View layer**.
+Similar to **Auth Session Management**, the application uses a global `ProfileReaderCubit`
+(a Cubit is a simplified version of a BLoC) that is injected into Flutter’s context and is accessible
+from anywhere within the **View layer**.
 
-This cubit has a couple of simple states:
-- **Loading** - profile is currently loading
-- **IsLoaded** - profile is loaded and stored in this state
-- **Error** - error while accessing user profile
+This Cubit has the following states:
+
+- **Loading** – The user profile is currently being loaded
+- **Loaded** – The user profile has been successfully loaded and stored in the state
+- **Error** – An error occurred while fetching or processing the user profile
 
 ---
 
@@ -218,57 +280,109 @@ In flashcard systems, spaced repetition works as follows:
 By focusing more on difficult cards and less on well-known ones, spaced repetition makes learning more efficient and helps transfer knowledge from short-term to long-term memory.
 
 ## How is spaced repetition implemented in this project?
-We used open-source library that implements **FSRS** spaced repetition algorithm. It's important to understand how this library works:
-- It uses ```Card``` objects to store information for **one flashcard** per user
-- This object contains information about the learning state of one flashcard, including the **due date**. This date refers date when this flashcard should ideally be visited again
-- When flashcard is shown to user, he must honestly answer how difficult the flashcard was for him -> ```again, hard, good, easy```
-- Based on the user input and the ```Card``` object for that flashcard, library can generate new ```Card``` object with new learning information about that flashcard and new **due date**
+We use an open-source library that implements the **FSRS** algorithm. It is important to understand how this library works:
+- It uses `Card` objects to store information for **one flashcard per user**
+- Each `Card` object contains information about the learning state of a flashcard, including the **due date** — the date when this flashcard should ideally be reviewed again
+- When a flashcard is shown to the user, they indicate how difficult it was for them to recall the information, choosing from: `again`, `hard`, `good`, `easy`
+- Based on the user input and the current `Card` object, the library generates a new `Card` object with updated learning information and a new **due date**
 
-Since the core of this library is ```Card``` object, we create **N-N** relationship between **flashcards** and **users** collections. For this relationship we use new collection: ```fcp_data``` (**f**lash**c**ard-**p**rofile **data**)
+Since the core of the library is the `Card` object, we create a **many-to-many (N-N) relationship** between the **flashcards** and **users** collections. To handle this relationship, we use a dedicated collection: `fcp_data` (**f**lash**c**ard-**p**rofile **data**).
 
-This collection is used for many different features of flashcards, bookmarking flashcards, ignoring flashcards, storing fsrs algo data, preloading flashcard info with snapshots...
+This collection is used for multiple purposes:
+- storing FSRS algorithm data for each flashcard-user pair
+- bookmarking flashcards
+- ignoring flashcards
+- preloading flashcard information with snapshots
+- and other flashcard-related features
 
-### Opening a pack will start the flashcard test
+### Opening a Pack Starts the Flashcard Test
 
-- When user opens the pack, we try to find 80% of the flashcards from that pack that he previously interacted with, and 20% of flashcards that user never saw. We limit the amount of flashcards per one test session (user can change this numer in settings)
-- If there is not enough old or new flashcards, we exchange them. Ex: if there are not enough new cards, we will grab more old cards in order to fill the target amount of cards per session
+- When a user opens a pack, we try to find **80% of flashcards** from that pack that they previously interacted with, and **20% of flashcards** that the user has never seen. We limit the number of flashcards per test session (the user can change this number in settings).
+- If there are not enough old or new flashcards, we replace them. For example, if there are not enough new cards, we will grab more old cards to fill the target number of cards per session.
 
-When test is started, flashcards are shown one by one.
-- Question will be displayed first
-- After tapping **reveal** button, answer will appear
-- After that, user can rate how difficult the question was
-- After rating, we use old ```Card``` object pulled from database when starting a test and using the user input to generate new ```Card``` data.
-- This new data is then written back to ```fcp_data``` collection
-- Next question is shown and cycle continues.
+When the test starts, flashcards are shown one by one:
+- The **question** is displayed first.
+- After tapping the **reveal** button, the **answer** appears.
+- The user can then rate how difficult the question was.
+- Using the old ```Card``` object pulled from the database at the start of the test and the user's rating, we generate new ```Card``` data.
+- This new data is then written back to the ```fcp_data``` collection.
+- The next question is shown, and the cycle continues.
 
-When user completes all of the flashcards from the test session, he will get an option to continue practicing from this pack indefinitely.
+When a user completes all flashcards from the test session, they are given the option to continue practicing from this pack indefinitely.
 
-This option just pulls flashcards in the same way as before in batches of 20.
+This option pulls flashcards in the same way as before, in **batches of 20**.
 
-## Bookmark test with flashcards
+## Bookmark Test with Flashcards
 
-Users can bookmark flashcards, this info is stored in ```fcp_data``` collection in database.
+Users can **bookmark flashcards**, and this information is stored in the ```fcp_data``` collection.
 
-Users can review those bookmarked flashcards and also start a "*bookmark test*".
+Users can review bookmarked flashcards and also start a **"bookmark test"**.
 
-This test grabs all flashcards that are due for review and are bookmarked, the rest of the functionality is the same as the standard test explained above.
+This test grabs all flashcards that are **due for review** and **bookmarked**. The rest of the functionality is the same as the standard test described above.
 
-## Custom sessions with flashcards
+## Custom Sessions with Flashcards
 
-Users have a option to create their own custom test with flashcard packs. Thay can choose multiple packs, filter out certain flashcards that they want to include or exclude and create a custom test out of it.
+Users have the option to create their own **custom test** with flashcard packs. They can choose multiple packs, filter which flashcards to include or exclude, and generate a custom test based on these selections.
 
-it works like this:
-- User chooses packs he wants to combine
-- Based on those packs, he can then choose if he wants to include all cards from that pack, seen cards, bookarked cards or ignored cards only
-- Then, he can include/exclude certain types of cards. Each card contains tags, based on them, user can tick on or off tags that exist in the selected packs
-- The last step is to enter the amount of cards he wants to include in his custom session*
+It works like this:
+- The user selects the packs they want to combine.
+- Based on those packs, they can choose to include **all cards**, **seen cards**, **bookmarked cards**, or **ignored cards only**.
+- They can also include/exclude certain types of cards based on **tags**. Each card contains tags, and the user can select which tags to include or exclude.
+- Finally, the user enters the number of cards they want to include in their custom session.
 
-**Note on the number of cards per session** - on last step of creating custom sessions, user can enter a number of cards he wants to include. Major issue is that firestore doesn't have that much power when it comes to querying, we can't accurately calculate how many cards will be present based on the filters user chose. We inform the user that the result custom session may contain less flashcards that what he originally entered.
+**Note on the number of cards per session:** On the last step of creating a custom session, the user enters the number of cards they want. Firestore has limited querying capabilities, so we cannot always accurately calculate how many cards will match the chosen filters. We inform the user that the resulting custom session may contain **fewer flashcards** than originally requested.
 
-A **firebase cloud function** is than called with the entered parameters to create that custom session. We used cloud function for that because putting that much strain on the client to pull all of the flashcards and do a complex read and filter operation is not a good idea.
+A **Firebase Cloud Function** is then called with the entered parameters to create the custom session. We use a cloud function for this because performing such a complex read and filter operation on the client side would put too much strain on it.
 
 ---
 
-# How does OSCE tests work?
+# How OSCE Tests Work
 
+## OSCE Database
 
+```mermaid
+classDiagram
+    class OSCE {
+        String id
+        String name
+        String scenario
+    }
+
+    class Question {
+        String id
+        String text
+        Number index
+        String imageDownloadUrl
+        List<Check> checks
+    }
+
+    class Check {
+        String id
+        String description
+        Boolean isCorrect
+    }
+
+    OSCE "1" --> "*" Question : subcollection
+    Question "1" --> "*" Check : embedded list
+```
+
+> The `OSCE` entity is stored as a document inside the **osces** collection.  
+Each `OSCE` document contains a **questions** subcollection, where each document represents a single question.
+
+> A `Question` document includes a `checks` field, which is an array of embedded objects representing evaluation criteria.  
+`Check` objects are not stored as a separate collection, but as a nested list inside the `Question` document.
+
+## How Users Interact with OSCE Tests
+
+1. User opens an OSCE test.
+2. The OSCE **name** and **scenario** are displayed.
+3. User clicks **Start test**. The test starts and lasts a maximum of **10 minutes**.
+4. Question **text** with an optional **image** is shown.
+5. When the **reveal** button is clicked, the **checks** for that question are displayed, and the button becomes **Next**.
+6. Clicking **Next** shows a new question, and the cycle continues from step 4.
+7. Users can freely navigate to previous questions to mark or unmark checks.
+8. When the last question is finished, or the timer runs out, the **results** are shown for this test.
+
+On the results screen, users can review their previous results for this OSCE.  
+
+Users can also access **all results** for OSCE tests they have taken.
